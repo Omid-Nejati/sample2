@@ -1,0 +1,33 @@
+# Research starting points; DO NOT report them as tuned/hyperparameter-optimal.
+model:
+  qwen: Qwen/Qwen3-VL-8B-Instruct
+  sam3: facebook/sam3
+  medsam3_lora: null  # explicit path to downloaded authorized checkpoint
+spectral:
+  targets: [q_proj, v_proj]
+  experts: 4
+  rank_per_expert: 2
+  top_k: 2
+  rho: 10.0
+  svd_init: true
+  centered_anchor: true
+  ema_beta: 0.90
+segmentation:
+  region_queries: 4
+  prompt_dim: 256
+  use_predicted_box: true  # disable until verified on actual SAM3 commit
+  mask_loss: [bce, dice, boundary]
+  gt_box_as_eval_prompt: false
+training:
+  lr: 0.0001
+  seg_weight: 1.0
+  route_weight: 0.05
+  balance_weight: 0.01
+  gradient_clip: 1.0
+  # Start with bridge-only (freeze experts), then joint optimization.
+  stage: bridge
+validation:
+  metrics: [dice, iou, boundary_f1, hd95, vqa_accuracy]
+  evaluate_absent_targets: true
+  separate_oracle_box_results: true
+  audit_pretraining_overlap: true

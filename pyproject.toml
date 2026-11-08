@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medqwenv2-sear"
+version = "0.1.0"
+description = "Research prototype: spatial-evidence aligned spectral experts for medical VLMs"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.2"]
+
+[project.optional-dependencies]
+qwen = ["transformers>=5.0", "accelerate", "pillow"]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
