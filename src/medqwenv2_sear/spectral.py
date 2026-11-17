@@ -92,11 +92,16 @@ class SpectralMoELinear(nn.Module):
         nn.init.zeros_(self.difficulty.weight)
         nn.init.zeros_(self.difficulty.bias)
         self.capture_task: Optional[str] = None
+        # Runtime-only control; not a checkpoint buffer or trainable parameter.
+        self.collect_projection = True
         self.recent_prob: Dict[str, torch.Tensor] = {}
         self.recent_difficulty: Dict[str, torch.Tensor] = {}
         self._projections: Dict[str, torch.Tensor] = {}
 
     def _projected_grad(self, x: torch.Tensor, dy: torch.Tensor, task: str) -> None:
+        # Only task-loss backpropagation may update conflict probes.
+        if not self.collect_projection:
+            return
         # G = dL/dW = Σ_n (dL/dy_n) x_n^T.
         # U_e^T G V_e = (dy @ U_e)^T (x @ V_e), without materializing G.
         with torch.no_grad():
