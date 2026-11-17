@@ -2,25 +2,7 @@
 
 **Purpose:** research starter code for the proposed *Spatial Evidence-Aligned Spectral Expert Routing* architecture for medical VQA + 2D medical segmentation. It is **not** a trained system, tested clinical model, or claimed CVPR result.
 
-## Verified vs. experimental
 
-| Part | Status |
-|---|---|
-| Standalone SVD-initialized spectral MoE layers | CPU-tested |
-| Exact pretrained-output centering at adapter initialization (top-k included) | CPU-tested |
-| Projected, factorization-independent spectral gradient conflict | CPU-tested |
-| Task-agnostic inference router, EMA role specialization, sequential two-task training | CPU-tested |
-| Region-query prompt projector + predicted cxcywh boxes + coarse localization | CPU-tested |
-| Semantic Dice/BCE/boundary losses, presence and grounding consistency | CPU-tested |
-| End-to-end toy VQA + segmentation training | CPU-tested (synthetic circles; not a medical benchmark) |
-| Actual Qwen3-VL-8B weights, environment/quantization/FSDP | **Unverified on GPU** |
-| Native SAM3 injected prompt forward and MedSAM3-v1 LoRA | **Unverified on real weights** |
-| Medical dataset loaders, native SAM3 instance Hungarian loss, full multi-GPU training | **Not implemented** |
-| Segmentation-error-supervised routing difficulty predictor | CPU-tested (toy) |
-| Mask-conditioned evidence pooled into an answer-verification head | CPU-tested (toy) |
-| Dynamic per-direction SVD rank reallocation; full mask feedback into autoregressive generation | **Not implemented** |
-
-The current code implements **soft adaptive expert specialization via routing biases**, NOT actual physical SVD rank reallocation. A mask-conditioned region feature does feed an answer-presence/verification head; it **does not** yet alter the autoregressive Qwen token-generation path. These are explicit limitations of v0.1.
 
 ## Install on a machine with PyTorch
 
