@@ -3,6 +3,7 @@ from contextlib import nullcontext
 import torch
 from torch import nn
 from .spectral import spectral_layers
+from .spectral_stability import (model_subspace_penalty, project_model_to_initial_subspaces_)
 from torch.nn import functional as F
 
 
@@ -45,7 +46,9 @@ def train_pair_step(model, optimizer, vqa_inputs, seg_inputs, mask,
                     *, spatial_features=None, native_sam_batch=None,
                     seg_weight=1.0, route_weight=0.05, balance_weight=0.01,
                     grad_clip=1.0, predicted_box=False, update_conflict=True,
-                    difficulty_weight=0.1):
+                    difficulty_weight=0.1,
+                    spectral_constraint_weight=0.0,
+                    project_spectral_subspaces=False):
     """One language minibatch + one segmentation minibatch, with memory reuse.
 
     `seg_inputs` goes through the VLM separately. Capture gradients in a *fixed*
@@ -71,8 +74,14 @@ def train_pair_step(model, optimizer, vqa_inputs, seg_inputs, mask,
         seg_objective.backward()
     for _,layer in spectral_layers(model):
         layer.finish_task("seg")
+    if spectral_constraint_weight < 0:
+        raise ValueError('spectral_constraint_weight must be non-negative')
+    if spectral_constraint_weight > 0:
+        (spectral_constraint_weight * model_subspace_penalty(model)).backward()
     torch.nn.utils.clip_grad_norm_((p for p in model.parameters() if p.requires_grad),grad_clip)
     optimizer.step()
+    if project_spectral_subspaces:
+        project_model_to_initial_subspaces_(model)
     conflicts=[]
     if update_conflict:
         for _,layer in spectral_layers(model):
