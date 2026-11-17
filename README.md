@@ -1,6 +1,6 @@
-# MedQwenV2-SEAR — executable method prototype (2026-11-06)
+# MedQwenV2-SEAR — 
 
-**Purpose:** research starter code for the proposed *Spatial Evidence-Aligned Spectral Expert Routing* architecture for medical VQA + 2D medical segmentation. It is **not** a trained system, tested clinical model, or claimed CVPR result.
+
 
 
 
