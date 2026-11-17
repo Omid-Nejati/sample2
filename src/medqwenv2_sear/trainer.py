@@ -42,6 +42,36 @@ def _regularizer(model,task,route_weight,balance_weight):
     return reg if reg is not None else next(model.parameters()).sum()*0
 
 
+def _backward_with_isolated_projection(task_loss, auxiliary_loss, layers, *, measure_conflict):
+    """Accumulate the complete training gradient, but probe supervised gradients only.
+
+    Output-gradient hooks are installed during the task forward. They record
+    only the first (supervised) backward. With no conflict measurement, use
+    one ordinary backward to avoid the extra retained graph and traversal.
+    Restoring per-layer flags is necessary when the caller reuses the model.
+    """
+    previous = [layer.collect_projection for layer in layers]
+    try:
+        if not measure_conflict:
+            for layer in layers:
+                layer.collect_projection = False
+            (task_loss + auxiliary_loss).backward()
+        elif auxiliary_loss.requires_grad:
+            for layer in layers:
+                layer.collect_projection = True
+            task_loss.backward(retain_graph=True)
+            for layer in layers:
+                layer.collect_projection = False
+            auxiliary_loss.backward()
+        else:
+            for layer in layers:
+                layer.collect_projection = True
+            task_loss.backward()
+    finally:
+        for layer, flag in zip(layers, previous):
+            layer.collect_projection = flag
+
+
 def train_pair_step(model, optimizer, vqa_inputs, seg_inputs, mask,
                     *, spatial_features=None, native_sam_batch=None,
                     seg_weight=1.0, route_weight=0.05, balance_weight=0.01,
@@ -57,22 +87,31 @@ def train_pair_step(model, optimizer, vqa_inputs, seg_inputs, mask,
     """
     model.train()
     optimizer.zero_grad(set_to_none=True)
+    layers = [layer for _, layer in spectral_layers(model)]
+    # Avoid mixing new task probes with projections from an earlier step
+    # (especially if the previous step disabled affinity refresh).
+    for layer in layers:
+        layer._projections.clear()
     with model.task("vqa"):
         vqa = model.forward_vqa(vqa_inputs)
-        vqa_objective = vqa["loss"] + _regularizer(model,"vqa",route_weight,balance_weight)
-        vqa_objective.backward()
-    for _,layer in spectral_layers(model):
+        vqa_auxiliary = _regularizer(model, "vqa", route_weight, balance_weight)
+        _backward_with_isolated_projection(
+            vqa["loss"], vqa_auxiliary, layers, measure_conflict=update_conflict
+        )
+    for layer in layers:
         layer.finish_task("vqa")
     with model.task("seg"):
         seg = model.forward_seg(seg_inputs,mask,spatial_features=spatial_features,
                                 native_sam_batch=native_sam_batch,predicted_box=predicted_box)
         spatial_target = _spatial_difficulty_target(seg["mask_logits"],mask)
         difficulty_term = _difficulty_loss(model,spatial_target)
-        seg_objective = (seg_weight*seg["loss"] +
-                         _regularizer(model,"seg",route_weight,balance_weight) +
-                         difficulty_weight*difficulty_term)
-        seg_objective.backward()
-    for _,layer in spectral_layers(model):
+        seg_auxiliary = (_regularizer(model, "seg", route_weight, balance_weight)
+                         + difficulty_weight*difficulty_term)
+        _backward_with_isolated_projection(
+            seg_weight*seg["loss"], seg_auxiliary, layers,
+            measure_conflict=update_conflict
+        )
+    for layer in layers:
         layer.finish_task("seg")
     if spectral_constraint_weight < 0:
         raise ValueError('spectral_constraint_weight must be non-negative')
